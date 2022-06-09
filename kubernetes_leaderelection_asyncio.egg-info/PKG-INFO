@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: kubernetes-leaderelection-asyncio
+Version: 0.1
+Summary: Leader electrion for kubernetes asyncio client
+Home-page: https://github.com/ollytheninja/kubernetes_leaderelection_asyncio
+Author: 
+Author-email: 
+License: Apache License Version 2.0
+Platform: UNKNOWN
+License-File: LICENSE
+
+        a copy of the leader election code from the Official Python client library for kubernetes to make it compatible with it's not so official asyncio counterpart.     
+    
+
