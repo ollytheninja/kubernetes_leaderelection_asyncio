@@ -13,19 +13,20 @@
 # limitations under the License.
 
 
-from . import leaderelection
-from .leaderelectionrecord import LeaderElectionRecord
-from kubernetes_asyncio.client.rest import ApiException
-from . import electionconfig
-import unittest
-import threading
 import json
+import threading
 import time
-import pytest
+import unittest
+
+from kubernetes_asyncio.client.rest import ApiException
+
+from . import electionconfig
+from . import leaderelection
 
 thread_lock = threading.RLock()
 
-class LeaderElectionTest(unittest.TestCase):
+
+class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
     def test_simple_leader_election(self):
         election_history = []
         leadership_history = []
@@ -40,7 +41,8 @@ class LeaderElectionTest(unittest.TestCase):
         def on_change():
             election_history.append("change record")
 
-        mock_lock = MockResourceLock("mock", "mock_namespace", "mock", thread_lock, on_create, on_update, on_change, None)
+        mock_lock = MockResourceLock("mock", "mock_namespace", "mock", thread_lock, on_create, on_update, on_change,
+                                     None)
 
         def on_started_leading():
             leadership_history.append("start leading")
@@ -59,7 +61,7 @@ class LeaderElectionTest(unittest.TestCase):
         self.assert_history(election_history, ["create record", "update record", "update record", "update record"])
         self.assert_history(leadership_history, ["get leadership", "start leading", "stop leading"])
 
-    def test_leader_election(self):
+    async def test_leader_election(self):
         election_history = []
         leadership_history = []
 
@@ -73,7 +75,8 @@ class LeaderElectionTest(unittest.TestCase):
         def on_change_A():
             election_history.append("A gets leadership")
 
-        mock_lock_A = MockResourceLock("mock", "mock_namespace", "MockA", thread_lock, on_create_A, on_update_A, on_change_A, None)
+        mock_lock_A = MockResourceLock("mock", "mock_namespace", "MockA", thread_lock, on_create_A, on_update_A,
+                                       on_change_A, None)
         mock_lock_A.renew_count_max = 3
 
         def on_started_leading_A():
@@ -96,7 +99,8 @@ class LeaderElectionTest(unittest.TestCase):
         def on_change_B():
             leadership_history.append("B gets leadership")
 
-        mock_lock_B = MockResourceLock("mock", "mock_namespace", "MockB", thread_lock, on_create_B, on_update_B, on_change_B, None)
+        mock_lock_B = MockResourceLock("mock", "mock_namespace", "MockB", thread_lock, on_create_B, on_update_B,
+                                       on_change_B, None)
         mock_lock_B.renew_count_max = 4
 
         def on_started_leading_B():
@@ -113,10 +117,10 @@ class LeaderElectionTest(unittest.TestCase):
 
         threading.daemon = True
         # Enter leader election for A
-        threading.Thread(target=leaderelection.LeaderElection(config_A).run()).start()
+        threading.Thread(target=await leaderelection.LeaderElection(config_A).run()).start()
 
         # Enter leader election for B
-        threading.Thread(target=leaderelection.LeaderElection(config_B).run()).start()
+        threading.Thread(target=await leaderelection.LeaderElection(config_B).run()).start()
 
         time.sleep(5)
 
@@ -136,7 +140,6 @@ class LeaderElectionTest(unittest.TestCase):
                              "B starts leading",
                              "B stops leading"])
 
-
     """Expected behavior: to check if the leader stops leading if it fails to update the lock within the renew_deadline
     and stops leading after finally timing out. The difference between each try comes out to be approximately the sleep
     time.
@@ -149,6 +152,7 @@ class LeaderElectionTest(unittest.TestCase):
     on try update:  4.5s
     on try update:  6s
     Timeout - Leader Exits"""
+
     def test_Leader_election_with_renew_deadline(self):
         election_history = []
         leadership_history = []
@@ -166,7 +170,8 @@ class LeaderElectionTest(unittest.TestCase):
         def on_try_update():
             election_history.append("try update record")
 
-        mock_lock = MockResourceLock("mock", "mock_namespace", "mock", thread_lock, on_create, on_update, on_change, on_try_update)
+        mock_lock = MockResourceLock("mock", "mock_namespace", "mock", thread_lock, on_create, on_update, on_change,
+                                     on_try_update)
         mock_lock.renew_count_max = 3
 
         def on_started_leading():
@@ -201,12 +206,13 @@ class LeaderElectionTest(unittest.TestCase):
 
         for idx in range(len(history)):
             self.assertEqual(history[idx], expected[idx],
-                              msg="Not equal at index {}, expected {}, got {}".format(idx, expected[idx],
-                                                                                      history[idx]))
+                             msg="Not equal at index {}, expected {}, got {}".format(idx, expected[idx],
+                                                                                     history[idx]))
 
 
 class MockResourceLock:
-    def __init__(self, name, namespace, identity, shared_lock, on_create=None, on_update=None, on_change=None, on_try_update=None):
+    def __init__(self, name, namespace, identity, shared_lock, on_create=None, on_update=None, on_change=None,
+                 on_try_update=None):
         # self.leader_record is shared between two MockResourceLock objects
         self.leader_record = []
         self.renew_count = 0

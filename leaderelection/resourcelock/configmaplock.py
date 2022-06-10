@@ -12,23 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from kubernetes_asyncio.client.rest import ApiException
-from kubernetes_asyncio import client, config
-from kubernetes_asyncio.client.api_client import ApiClient
-from ..leaderelectionrecord import LeaderElectionRecord
 import json
 import logging
+
+from kubernetes_asyncio import client
+from kubernetes_asyncio.client.rest import ApiException
+
+from leaderelectionrecord import LeaderElectionRecord
+
 logging.basicConfig(level=logging.INFO)
 
 
 class ConfigMapLock:
-    def __init__(self, name, namespace, identity):
+    def __init__(self, name, namespace, identity, k8s_api):
         """
         :param name: name of the lock
         :param namespace: namespace
         :param identity: A unique identifier that the candidate is using
         """
-        self.api_instance = client.CoreV1Api()
+        self.api_instance = k8s_api
         self.leader_electionrecord_annotationkey = 'control-plane.alpha.kubernetes.io/leader'
         self.name = name
         self.namespace = namespace
@@ -39,17 +41,17 @@ class ConfigMapLock:
             'leaseDurationSeconds': None,
             'acquireTime': None,
             'renewTime': None
-                            }
+        }
 
     # get returns the election record from a ConfigMap Annotation
-    def get(self, name, namespace):
+    async def get(self, name, namespace):
         """
         :param name: Name of the configmap object information to get
         :param namespace: Namespace in which the configmap object is to be searched
         :return: 'True, election record' if object found else 'False, exception response'
         """
         try:
-            api_response = self.api_instance.read_namespaced_config_map(name, namespace)
+            api_response = await self.api_instance.read_namespaced_config_map(name, namespace)
 
             # If an annotation does not exist - add the leader_electionrecord_annotationkey
             annotations = api_response.metadata.annotations
@@ -71,7 +73,7 @@ class ConfigMapLock:
         except ApiException as e:
             return False, e
 
-    def create(self, name, namespace, election_record):
+    async def create(self, name, namespace, election_record):
         """
         :param electionRecord: Annotation string
         :param name: Name of the configmap object to be created
@@ -80,16 +82,17 @@ class ConfigMapLock:
         """
         body = client.V1ConfigMap(
             metadata={"name": name,
-                      "annotations": {self.leader_electionrecord_annotationkey: json.dumps(self.get_lock_dict(election_record))}})
+                      "annotations": {
+                          self.leader_electionrecord_annotationkey: json.dumps(self.get_lock_dict(election_record))}})
 
         try:
-            api_response = self.api_instance.create_namespaced_config_map(namespace, body, pretty=True)
+            api_response = await self.api_instance.create_namespaced_config_map(namespace, body, pretty=True)
             return True
         except ApiException as e:
             logging.info("Failed to create lock as {}".format(e))
             return False
 
-    def update(self, name, namespace, updated_record):
+    async def update(self, name, namespace, updated_record):
         """
         :param name: name of the lock to be updated
         :param namespace: namespace the lock is in
@@ -98,9 +101,10 @@ class ConfigMapLock:
         """
         try:
             # Set the updated record
-            self.configmap_reference.metadata.annotations[self.leader_electionrecord_annotationkey] = json.dumps(self.get_lock_dict(updated_record))
-            api_response = self.api_instance.replace_namespaced_config_map(name=name, namespace=namespace,
-                                                                           body=self.configmap_reference)
+            self.configmap_reference.metadata.annotations[self.leader_electionrecord_annotationkey] = json.dumps(
+                self.get_lock_dict(updated_record))
+            api_response = await self.api_instance.replace_namespaced_config_map(name=name, namespace=namespace,
+                                                                                 body=self.configmap_reference)
             return True
         except ApiException as e:
             logging.info("Failed to update lock as {}".format(e))
@@ -125,5 +129,5 @@ class ConfigMapLock:
         self.lock_record['leaseDurationSeconds'] = leader_election_record.lease_duration
         self.lock_record['acquireTime'] = leader_election_record.acquire_time
         self.lock_record['renewTime'] = leader_election_record.renew_time
-        
+
         return self.lock_record

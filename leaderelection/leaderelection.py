@@ -17,9 +17,10 @@ import sys
 import time
 import json
 import threading
-from .leaderelectionrecord import LeaderElectionRecord
 import logging
 # if condition to be removed when support for python2 will be removed
+from leaderelectionrecord import LeaderElectionRecord
+
 if sys.version_info > (3, 0):
     from http import HTTPStatus
 else:
@@ -52,34 +53,34 @@ class LeaderElection:
         self.observed_time_milliseconds = 0
 
     # Point of entry to Leader election
-    def run(self):
+    async def run(self):
         # Try to create/ acquire a lock
-        if self.acquire():
+        if await self.acquire():
             logging.info("{} successfully acquired lease".format(self.election_config.lock.identity))
 
             # Start leading and call OnStartedLeading()
             threading.daemon = True
             threading.Thread(target=self.election_config.onstarted_leading).start()
 
-            self.renew_loop()
+            await self.renew_loop()
 
             # Failed to update lease, run OnStoppedLeading callback
             self.election_config.onstopped_leading()
 
-    def acquire(self):
+    async def acquire(self):
         # Follower
         logging.info("{} is a follower".format(self.election_config.lock.identity))
         retry_period = self.election_config.retry_period
 
         while True:
-            succeeded = self.try_acquire_or_renew()
+            succeeded = await self.try_acquire_or_renew()
 
             if succeeded:
                 return True
 
             time.sleep(retry_period)
 
-    def renew_loop(self):
+    async def renew_loop(self):
         # Leader
         logging.info("Leader has entered renew loop and will try to update lease continuously")
 
@@ -91,7 +92,7 @@ class LeaderElection:
             succeeded = False
 
             while int(time.time() * 1000) < timeout:
-                succeeded = self.try_acquire_or_renew()
+                succeeded = await self.try_acquire_or_renew()
 
                 if succeeded:
                     break
@@ -104,12 +105,12 @@ class LeaderElection:
             # failed to renew, return
             return
 
-    def try_acquire_or_renew(self):
+    async def try_acquire_or_renew(self):
         now_timestamp = time.time()
         now = datetime.datetime.fromtimestamp(now_timestamp)
 
         # Check if lock is created
-        lock_status, old_election_record = self.election_config.lock.get(self.election_config.lock.name,
+        lock_status, old_election_record = await self.election_config.lock.get(self.election_config.lock.name,
                                                                         self.election_config.lock.namespace)
 
         # create a default Election record for this candidate
@@ -118,17 +119,10 @@ class LeaderElection:
 
         # A lock is not created with that name, try to create one
         if not lock_status:
-            # To be removed when support for python2 will be removed
-            if sys.version_info > (3, 0):
-                if json.loads(old_election_record.body)['code'] != HTTPStatus.NOT_FOUND:
-                    logging.info("Error retrieving resource lock {} as {}".format(self.election_config.lock.name,
-                                                                                  old_election_record.reason))
-                    return False
-            else:
-                if json.loads(old_election_record.body)['code'] != httplib.NOT_FOUND:
-                    logging.info("Error retrieving resource lock {} as {}".format(self.election_config.lock.name,
-                                                                                  old_election_record.reason))
-                    return False
+            if json.loads(old_election_record.body)['code'] != httplib.NOT_FOUND:
+                logging.info("Error retrieving resource lock {} as {}".format(self.election_config.lock.name,
+                                                                              old_election_record.reason))
+                return False
 
             logging.info("{} is trying to create a lock".format(leader_election_record.holder_identity))
             create_status = self.election_config.lock.create(name=self.election_config.lock.name,
@@ -147,12 +141,12 @@ class LeaderElection:
         # Validate old_election_record
         if old_election_record is None:
             # try to update lock with proper annotation and election record
-            return self.update_lock(leader_election_record)
+            return await self.update_lock(leader_election_record)
 
         if (old_election_record.holder_identity is None or old_election_record.lease_duration is None
                 or old_election_record.acquire_time is None or old_election_record.renew_time is None):
             # try to update lock with proper annotation and election record
-            return self.update_lock(leader_election_record)
+            return await self.update_lock(leader_election_record)
 
         # Report transitions
         if self.observed_record and self.observed_record.holder_identity != old_election_record.holder_identity:
@@ -173,11 +167,11 @@ class LeaderElection:
             # Leader updates renewTime, but keeps acquire_time unchanged
             leader_election_record.acquire_time = self.observed_record.acquire_time
 
-        return self.update_lock(leader_election_record)
+        return await self.update_lock(leader_election_record)
 
-    def update_lock(self, leader_election_record):
+    async def update_lock(self, leader_election_record):
         # Update object with latest election record
-        update_status = self.election_config.lock.update(self.election_config.lock.name,
+        update_status = await self.election_config.lock.update(self.election_config.lock.name,
                                                          self.election_config.lock.namespace,
                                                          leader_election_record)
 

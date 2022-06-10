@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: leader-election
+  labels:
+    app: leader-election
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: leader-election
+  template:
+    metadata:
+      labels:
+        app: leader-election
+    spec:
+      serviceAccountName: leader-election
+      containers:
+      - name: leader-election
+        image: demo-leader-election:latest
+        imagePullPolicy: Always
+        env:
+          - name: LOCK_NAME
+            value: lock-demo
+          - name: LOCK_NAMESPACE
+            value: leader-election
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: leader-election
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-election-cm-access
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["configmaps"]
+  resourceNames: ["lock-demo"]
+  verbs: ["get", "watch", "update"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-election-cm-access
+subjects:
+- kind: ServiceAccount
+  name: leader-election # "name" is case sensitive
+
+roleRef:
+  kind: Role
+  name: leader-election-cm-access
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lock-demo
+data:
