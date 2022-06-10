@@ -1,6 +1,6 @@
 from setuptools import setup
 
-CLIENT_VERSION = "0.1"
+CLIENT_VERSION = "0.1.1"
 PACKAGE_NAME = "kubernetes_leaderelection_asyncio"
 
 with open('requirements.txt') as f:
@@ -16,7 +16,10 @@ setup(
     url="https://github.com/ollytheninja/kubernetes_leaderelection_asyncio",
     keywords=[],
     install_requires=REQUIRES,
-    packages=['leaderelection'],
+    packages=[
+        'leaderelection',
+        'leaderelection.resourcelock',
+        ],
     include_package_data=True,
     long_description="""\
         a copy of the leader election code from the Official Python client library for kubernetes to make it compatible with it's not so official asyncio counterpart.     
