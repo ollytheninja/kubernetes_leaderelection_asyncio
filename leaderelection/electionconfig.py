@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 
 class Config:
     # Validate config, exit if an error is detected
-    def __init__(self, lock: ConfigMapLock, lease_duration: int, renew_deadline: int, retry_period: int, onstarted_leading: callable, onstopped_leading: callable):
+    def __init__(self, lock: ConfigMapLock, lease_duration: float, renew_deadline: float, retry_period: float, onstarted_leading: callable, onstopped_leading: callable):
         self.jitter_factor = 1.2
 
         if lock is None:
