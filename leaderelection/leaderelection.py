@@ -66,7 +66,7 @@ class LeaderElection:
             # Failed to update lease, run OnStoppedLeading callback
             self.election_config.onstopped_leading()
 
-    async def acquire(self):
+    async def acquire(self) -> bool:
         # Follower
         logging.info("{} is a follower".format(self.election_config.lock.identity))
         retry_period = self.election_config.retry_period
@@ -104,17 +104,19 @@ class LeaderElection:
             # failed to renew, return
             return
 
-    async def try_acquire_or_renew(self):
+    async def try_acquire_or_renew(self) -> bool:
         now_timestamp = time.time()
         now = datetime.datetime.fromtimestamp(now_timestamp)
 
         # Check if lock is created
-        lock_status, old_election_record = self.election_config.lock.get(self.election_config.lock.name,
-                                                                        self.election_config.lock.namespace)
+        lock_status, old_election_record = self.election_config.lock.get()
 
         # create a default Election record for this candidate
-        leader_election_record = LeaderElectionRecord(self.election_config.lock.identity,
-                                                     str(self.election_config.lease_duration), str(now), str(now))
+        leader_election_record = LeaderElectionRecord(
+            self.election_config.lock.identity,
+            str(self.election_config.lease_duration),
+            str(now), str(now)
+        )
 
         # A lock is not created with that name, try to create one
         if not lock_status:
@@ -124,9 +126,7 @@ class LeaderElection:
                 return False
 
             logging.info("{} is trying to create a lock".format(leader_election_record.holder_identity))
-            create_status = self.election_config.lock.create(name=self.election_config.lock.name,
-                                                             namespace=self.election_config.lock.namespace,
-                                                             election_record=leader_election_record)
+            create_status = self.election_config.lock.create(election_record=leader_election_record)
 
             if create_status is False:
                 logging.info("{} Failed to create lock".format(leader_election_record.holder_identity))
@@ -168,11 +168,9 @@ class LeaderElection:
 
         return await self.update_lock(leader_election_record)
 
-    async def update_lock(self, leader_election_record):
+    async def update_lock(self, leader_election_record: LeaderElectionRecord) -> bool:
         # Update object with latest election record
-        update_status = self.election_config.lock.update(self.election_config.lock.name,
-                                                         self.election_config.lock.namespace,
-                                                         leader_election_record)
+        update_status = self.election_config.lock.update(leader_election_record)
 
         if update_status is False:
             logging.info("{} failed to acquire lease".format(leader_election_record.holder_identity))

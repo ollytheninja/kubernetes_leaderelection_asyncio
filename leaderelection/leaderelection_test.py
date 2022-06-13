@@ -227,7 +227,7 @@ class MockResourceLock:
         self.on_change = on_change
         self.on_try_update = on_try_update
 
-    def get(self, name, namespace):
+    def get(self):
         self.lock.acquire()
         try:
             if self.leader_record:
@@ -238,7 +238,7 @@ class MockResourceLock:
         finally:
             self.lock.release()
 
-    def create(self, name, namespace, election_record):
+    def create(self, election_record):
         self.lock.acquire()
         try:
             if len(self.leader_record) == 1:
@@ -250,7 +250,7 @@ class MockResourceLock:
         finally:
             self.lock.release()
 
-    def update(self, name, namespace, updated_record):
+    def update(self, updated_record):
         self.lock.acquire()
         try:
             if self.on_try_update:

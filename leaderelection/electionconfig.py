@@ -14,12 +14,15 @@
 
 import sys
 import logging
+
+from resourcelock.configmaplock import ConfigMapLock
+
 logging.basicConfig(level=logging.INFO)
 
 
 class Config:
     # Validate config, exit if an error is detected
-    def __init__(self, lock, lease_duration, renew_deadline, retry_period, onstarted_leading, onstopped_leading):
+    def __init__(self, lock: ConfigMapLock, lease_duration: int, renew_deadline: int, retry_period: int, onstarted_leading: callable, onstopped_leading: callable):
         self.jitter_factor = 1.2
 
         if lock is None:
