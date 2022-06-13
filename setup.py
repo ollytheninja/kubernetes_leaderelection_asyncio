@@ -15,6 +15,7 @@ setup(
     license="Apache License Version 2.0",
     url="https://github.com/ollytheninja/kubernetes_leaderelection_asyncio",
     keywords=[],
+    python_requires='>3.7',
     install_requires=REQUIRES,
     packages=[
         'leaderelection',

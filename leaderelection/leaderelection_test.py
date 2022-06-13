@@ -20,14 +20,14 @@ import unittest
 
 from kubernetes_asyncio.client.rest import ApiException
 
-from . import electionconfig
-from . import leaderelection
+from electionconfig import Config
+from leaderelection import LeaderElection
 
 thread_lock = threading.RLock()
 
 
 class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
-    def test_simple_leader_election(self):
+    async def test_simple_leader_election(self):
         election_history = []
         leadership_history = []
 
@@ -51,12 +51,12 @@ class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
             leadership_history.append("stop leading")
 
         # Create config 4.5 4 3
-        config = electionconfig.Config(lock=mock_lock, lease_duration=2.5,
+        config = Config(lock=mock_lock, lease_duration=2.5,
                                        renew_deadline=2, retry_period=1.5, onstarted_leading=on_started_leading,
                                        onstopped_leading=on_stopped_leading)
 
         # Enter leader election
-        leaderelection.LeaderElection(config).run()
+        await LeaderElection(config).run()
 
         self.assert_history(election_history, ["create record", "update record", "update record", "update record"])
         self.assert_history(leadership_history, ["get leadership", "start leading", "stop leading"])
@@ -85,7 +85,7 @@ class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
         def on_stopped_leading_A():
             leadership_history.append("A stops leading")
 
-        config_A = electionconfig.Config(lock=mock_lock_A, lease_duration=2.5,
+        config_A = Config(lock=mock_lock_A, lease_duration=2.5,
                                          renew_deadline=2, retry_period=1.5, onstarted_leading=on_started_leading_A,
                                          onstopped_leading=on_stopped_leading_A)
 
@@ -109,7 +109,7 @@ class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
         def on_stopped_leading_B():
             leadership_history.append("B stops leading")
 
-        config_B = electionconfig.Config(lock=mock_lock_B, lease_duration=2.5,
+        config_B = Config(lock=mock_lock_B, lease_duration=2.5,
                                          renew_deadline=2, retry_period=1.5, onstarted_leading=on_started_leading_B,
                                          onstopped_leading=on_stopped_leading_B)
 
@@ -117,10 +117,10 @@ class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
 
         threading.daemon = True
         # Enter leader election for A
-        threading.Thread(target=await leaderelection.LeaderElection(config_A).run()).start()
+        threading.Thread(target=await LeaderElection(config_A).run()).start()
 
         # Enter leader election for B
-        threading.Thread(target=await leaderelection.LeaderElection(config_B).run()).start()
+        threading.Thread(target=await LeaderElection(config_B).run()).start()
 
         time.sleep(5)
 
@@ -153,7 +153,7 @@ class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
     on try update:  6s
     Timeout - Leader Exits"""
 
-    def test_Leader_election_with_renew_deadline(self):
+    async def test_Leader_election_with_renew_deadline(self):
         election_history = []
         leadership_history = []
 
@@ -181,12 +181,12 @@ class LeaderElectionTest(unittest.IsolatedAsyncioTestCase):
             leadership_history.append("stop leading")
 
         # Create config
-        config = electionconfig.Config(lock=mock_lock, lease_duration=2.5,
+        config = Config(lock=mock_lock, lease_duration=2.5,
                                        renew_deadline=2, retry_period=1.5, onstarted_leading=on_started_leading,
                                        onstopped_leading=on_stopped_leading)
 
         # Enter leader election
-        leaderelection.LeaderElection(config).run()
+        await LeaderElection(config).run()
 
         self.assert_history(election_history,
                             ["create record",

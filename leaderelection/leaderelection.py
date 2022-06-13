@@ -19,12 +19,11 @@ import json
 import threading
 import logging
 # if condition to be removed when support for python2 will be removed
+from electionconfig import Config
 from leaderelectionrecord import LeaderElectionRecord
 
-if sys.version_info > (3, 0):
-    from http import HTTPStatus
-else:
-    import httplib
+from http import HTTPStatus
+
 logging.basicConfig(level=logging.INFO)
 
 """
@@ -39,7 +38,7 @@ lease.
 
 
 class LeaderElection:
-    def __init__(self, election_config):
+    def __init__(self, election_config: Config):
         if election_config is None:
             sys.exit("argument config not passed")
 
@@ -110,7 +109,7 @@ class LeaderElection:
         now = datetime.datetime.fromtimestamp(now_timestamp)
 
         # Check if lock is created
-        lock_status, old_election_record = await self.election_config.lock.get(self.election_config.lock.name,
+        lock_status, old_election_record = self.election_config.lock.get(self.election_config.lock.name,
                                                                         self.election_config.lock.namespace)
 
         # create a default Election record for this candidate
@@ -119,7 +118,7 @@ class LeaderElection:
 
         # A lock is not created with that name, try to create one
         if not lock_status:
-            if json.loads(old_election_record.body)['code'] != httplib.NOT_FOUND:
+            if json.loads(old_election_record.body)['code'] != HTTPStatus.NOT_FOUND:
                 logging.info("Error retrieving resource lock {} as {}".format(self.election_config.lock.name,
                                                                               old_election_record.reason))
                 return False
@@ -171,7 +170,7 @@ class LeaderElection:
 
     async def update_lock(self, leader_election_record):
         # Update object with latest election record
-        update_status = await self.election_config.lock.update(self.election_config.lock.name,
+        update_status = self.election_config.lock.update(self.election_config.lock.name,
                                                          self.election_config.lock.namespace,
                                                          leader_election_record)
 
